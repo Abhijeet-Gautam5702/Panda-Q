@@ -8,6 +8,8 @@ export type Message = {
     message: string;
 }
 
+export type FilePath = string;
+
 /**
  * Ingress Buffer
  * 
@@ -19,15 +21,20 @@ export type Message = {
 class IngressBuffer {
     public buffer: Queue<Message>;
     private maxLength: number = 2000;
+    private ingressLogFile: FilePath;
+    private offset: number;
 
-    constructor() {
+    constructor(offset: number, ingressLogFile: FilePath) {
         this.buffer = new Queue<Message>();
+        this.offset = offset;
+        this.ingressLogFile = ingressLogFile;
     }
     
     push(message: Message): boolean | string {
         if (this.buffer.size() >= this.maxLength) {
             return ERROR_CODES.INGRESS_BUFFER_FULL;
         }
+        // TODO: Write to the ingress-log-file for persistence
         this.buffer.enqueue(message);
         return true;
     }

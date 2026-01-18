@@ -1,8 +1,7 @@
-import IngressBuffer from "./ingress-buffer";
-
 // Types
 export type PartitionId = string;
 export type TopicId = string;
+export type BrokerId = string;
 
 // Broker Class
 class Broker {
@@ -14,7 +13,7 @@ function partitioner(message: string): PartitionId {
     return "1";
 }
 
-function topicSorter(message:string): TopicId {
+function topicSorter(message: string): TopicId {
     return "1";
 }
 

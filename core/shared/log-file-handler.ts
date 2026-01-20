@@ -1,15 +1,9 @@
-import { FilePath, Message } from "../ingress-buffer.ts";
 import { promises as fs } from 'fs';
 import ERROR_CODES from "./error-codes.ts";
-import { BrokerId } from "../broker.ts";
+import { ensureFileExists } from "./utils.ts";
+import { FilePath, Message, BrokerId, LOG_FILE_TYPE } from "./types.ts";
 import dotenv from "dotenv";
 dotenv.config();
-
-// Types
-export enum LOG_FILE_TYPE {
-    INGRESS_BUFFER,
-    PARTITION_BUFFER
-}
 
 // Log File Handler
 class LogFileHandler {
@@ -22,6 +16,13 @@ class LogFileHandler {
         label: LOG_FILE_TYPE,
         filePath: FilePath,
     }) {
+        // Check if file exists (create if not)
+        const fileValidation = ensureFileExists(config.filePath);
+        if (!fileValidation.isValid) {
+            console.error("Failed to initialize log file handler:", fileValidation.error);
+            throw new Error(fileValidation.error);
+        }
+
         this.label = config.label;
         this.filePath = config.filePath;
     }

@@ -140,3 +140,6 @@ vite.config.ts.timestamp-*
 
 # Data volume
 pandaq-data/
+
+# Markdown files
+*.md

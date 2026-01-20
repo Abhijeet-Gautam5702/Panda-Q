@@ -1,5 +1,6 @@
 import IngressBuffer from "./ingress-buffer.ts";
 import dotenv from "dotenv";
+import ERROR_CODES from "./shared/error-codes.ts";
 dotenv.config();
 
 async function main() {
@@ -19,14 +20,20 @@ async function main() {
     console.log("Ingress buffer started successfully.");
 
     for (let i = 0; i < 4; i++) {
-        await ingressBuffer.push({
+        const pushResult = await ingressBuffer.push({
             topicId: "1",
             messageId: String(Math.random() + i),
-            content: "Hello World--" + Math.random() + "--New Message"
+            content: "Msg --" + Math.random() + "--" + new Date().toLocaleDateString()
         });
+        if (pushResult == ERROR_CODES.INGRESS_BUFFER_FULL) {
+            console.log("Ingress Buffer full.")
+            break;
+        }
     }
     console.log("Ingress Buffer final state:", ingressBuffer.buffer);
-    console.log("Ingress Buffer offset:", ingressBuffer.offset);
+    console.log("Ingress Buffer log-end offset:", ingressBuffer.logEndOffset);
+    console.log("Ingress Buffer read offset:", ingressBuffer.readOffset);
+    console.log("Lag B/W Broker Instance & Ingress Buffer:", ingressBuffer.logEndOffset - ingressBuffer.readOffset);
     console.log("Ingress Buffer size:", ingressBuffer.buffer.size());
     // Start the HTTP server
 

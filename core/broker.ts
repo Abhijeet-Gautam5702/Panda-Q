@@ -1,7 +1,4 @@
-// Types
-export type PartitionId = string;
-export type TopicId = string;
-export type BrokerId = string;
+import { PartitionId, TopicId, BrokerId } from "./shared/types.ts";
 
 // Broker Class
 class Broker {

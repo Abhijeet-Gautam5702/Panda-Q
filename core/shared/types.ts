@@ -1,20 +1,6 @@
-/**
- * Centralized Type Definitions
- * 
- * This file contains all shared types, interfaces, and enums used across the application.
- */
-
-// ============================================
-// BROKER TYPES
-// ============================================
-
 export type PartitionId = string;
 export type TopicId = string;
 export type BrokerId = string;
-
-// ============================================
-// MESSAGE TYPES
-// ============================================
 
 export type Message = {
     topicId: TopicId;
@@ -22,24 +8,25 @@ export type Message = {
     content: string;
 }
 
-// ============================================
-// FILE SYSTEM TYPES
-// ============================================
-
 export type FilePath = string;
-
-// ============================================
-// VALIDATION TYPES
-// ============================================
 
 export type ValidationResult = {
     isValid: boolean;
     error?: string;
 };
 
-// ============================================
-// LOG FILE TYPES
-// ============================================
+export type SuccessResponse<T = any> = {
+    success: true;
+    data: T;
+};
+
+export type ErrorResponse = {
+    success: false;
+    errorCode: string;
+    error: any;
+};
+
+export type Response<T = any> = SuccessResponse<T> | ErrorResponse;
 
 export enum LOG_FILE_TYPE {
     INGRESS_BUFFER,

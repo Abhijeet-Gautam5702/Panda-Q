@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import ERROR_CODES from "./error-codes.ts";
 import { ensureFileExists } from "./utils.ts";
-import { FilePath, Message, BrokerId, LOG_FILE_TYPE } from "./types.ts";
+import { FilePath, Message, BrokerId, LOG_FILE_TYPE, Response } from "./types.ts";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -37,13 +37,19 @@ class LogFileHandler {
         }
     }
 
-    async append(message: Message, offset: number): Promise<boolean | string> {
+    async append(message: Message, offset: number): Promise<Response<boolean>> {
         try {
             await fs.appendFile(this.filePath, this.formatLogEntry(message, offset), 'utf-8');
-            return true;
+            return {
+                success: true,
+                data: true
+            };
         } catch (error) {
-            console.log("Error appending log entry:", error);
-            return ERROR_CODES.LOG_FILE_APPEND_FAILED;
+            return {
+                success: false,
+                errorCode: ERROR_CODES.LOG_FILE_APPEND_FAILED,
+                error: error
+            };
         }
     }
 }

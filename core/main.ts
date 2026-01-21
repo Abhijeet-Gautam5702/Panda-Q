@@ -25,9 +25,15 @@ async function main() {
             messageId: String(Math.random() + i),
             content: "Msg --" + Math.random() + "--" + new Date().toLocaleDateString()
         });
-        if (pushResult == ERROR_CODES.INGRESS_BUFFER_FULL) {
-            console.log("Ingress Buffer full.")
-            break;
+
+        if (!pushResult.success) {
+            if (pushResult.errorCode === ERROR_CODES.INGRESS_BUFFER_FULL) {
+                console.log("Ingress Buffer full.");
+                break;
+            } else {
+                console.error("Error pushing message:", pushResult.errorCode, pushResult.error);
+                break;
+            }
         }
     }
     console.log("Ingress Buffer final state:", ingressBuffer.buffer);

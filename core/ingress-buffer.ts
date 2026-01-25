@@ -26,7 +26,7 @@ dotenv.config();
  */
 class IngressBuffer {
     public buffer: Queue<Message>;
-    private maxLength: number = 100;
+    private maxLength: number = 200_000_000;
     private static readonly logFilePath: FilePath = process.env.INGRESS_LOG_FILE as FilePath;
     private static readonly metadataFilePath: FilePath = process.env.METADATA_FILE as FilePath;
     logEndOffset: number = 0;

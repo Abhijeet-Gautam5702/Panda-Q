@@ -9,12 +9,16 @@ dotenv.config();
 class LogFileHandler {
     private readonly label: LOG_FILE_TYPE;
     private readonly filePath: FilePath;
+    private readonly topicId?: string;
+    private readonly partitionId?: number;
     private static readonly dataStorageVolume: FilePath = process.env.DATA_STORAGE_VOLUME as FilePath;
     private static readonly brokerId: BrokerId = process.env.BROKER_ID as BrokerId;
 
     constructor(config: {
         label: LOG_FILE_TYPE,
         filePath: FilePath,
+        topicId?: string,
+        partitionId?: number,
     }) {
         // Check if file exists (create if not)
         const fileValidation = ensureFileExists(config.filePath);
@@ -25,16 +29,20 @@ class LogFileHandler {
 
         this.label = config.label;
         this.filePath = config.filePath;
+        this.topicId = config.topicId;
+        this.partitionId = config.partitionId;
     }
 
     private formatLogEntry(message: Message, offset: number): string {
-        switch (this.label) {
-            case LOG_FILE_TYPE.INGRESS_BUFFER:
-                const stringifiedMsg = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
-                return [LogFileHandler.brokerId, offset, message.topicId, message.messageId, stringifiedMsg].join("|") + "\n";
-            default:
-                return "";
+        const stringifiedMsg = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
+
+        if (this.label === LOG_FILE_TYPE.INGRESS_BUFFER) {
+            return [LogFileHandler.brokerId, offset, message.topicId, message.messageId, stringifiedMsg].join("|") + "\n";
+        } else if (this.label === LOG_FILE_TYPE.PARTITION_BUFFER) {
+            return [this.topicId, this.partitionId, offset, message.messageId, stringifiedMsg].join("|") + "\n";
         }
+
+        return "";
     }
 
     async append(message: Message, offset: number): Promise<Response<boolean>> {

@@ -28,23 +28,27 @@ class IngressBuffer {
     public buffer: Queue<Message>;
     private maxLength: number = 200_000_000;
     private static readonly logFilePath: FilePath = process.env.INGRESS_LOG_FILE as FilePath;
-    private static readonly metadataFilePath: FilePath = process.env.METADATA_FILE as FilePath;
+    private static readonly metadataFilePath: FilePath = process.env.INGRESS_METADATA_FILE as FilePath;
     logEndOffset: number = 0;
     readOffset: number = 0;
     private readonly logHandler: LogFileHandler;
 
     constructor() {
+        console.log("[IngressBuffer] Initializing IngressBuffer...");
         const logFileValidation = ensureFileExists(IngressBuffer.logFilePath);
         if (!logFileValidation.isValid) {
             console.error("Failed to initialize log file:", logFileValidation.error);
             process.exit(1);
         }
+        console.log(`[IngressBuffer] Ingress log file validated: ${IngressBuffer.logFilePath}`);
 
         const metadataFileValidation = ensureFileExists(IngressBuffer.metadataFilePath);
         if (!metadataFileValidation.isValid) {
             console.error("Failed to initialize metadata file:", metadataFileValidation.error);
             process.exit(1);
         }
+        console.log(`[IngressBuffer] Ingress metadata file validated: ${IngressBuffer.metadataFilePath}`);
+
 
         const valuesFromMetadata = this.extractDataFromMetadata();
         if (!valuesFromMetadata.success) {
@@ -55,6 +59,7 @@ class IngressBuffer {
         const { logEndOffset, readOffset } = valuesFromMetadata.data;
         this.logEndOffset = logEndOffset;
         this.readOffset = readOffset;
+        console.log(`[IngressBuffer] Ingress metadata loaded - logEndOffset: ${logEndOffset}, readOffset: ${readOffset}`);
         if (this.logEndOffset < this.readOffset) {
             console.error("Invalid offset state detected. Log end offset is less than read offset.");
             process.exit(1);
@@ -73,6 +78,7 @@ class IngressBuffer {
             console.error("Error building ingress buffer from log file:", buildResult.errorCode, buildResult.error);
             process.exit(1);
         }
+        console.log(`[IngressBuffer] IngressBuffer initialized successfully with ${this.buffer.size()} message(s)`);
     }
 
     // Private methods
@@ -86,12 +92,11 @@ class IngressBuffer {
                 const [brokerId, offset, topicId, messageId, content] = log.split("|");
                 this.buffer.enqueue({
                     topicId,
-                    messageId,
+                    messageId: Number(messageId),
                     content
                 });
             }
 
-            console.log("[DEBUG] Buffer Size After Build In Boot:", this.buffer.size());
             return {
                 success: true,
                 data: true
@@ -99,7 +104,7 @@ class IngressBuffer {
         } catch (error) {
             return {
                 success: false,
-                errorCode: ERROR_CODES.INGRESS_BUFFER_BUILD_FAILED,
+                errorCode: ERROR_CODES.BUFFER_BUILD_FAILED,
                 error: error
             };
         }
@@ -201,6 +206,7 @@ class IngressBuffer {
     async push(message: Message): Promise<Response<boolean>> {
         try {
             if (this.buffer.size() >= this.maxLength) {
+                console.log(`[IngressBuffer] Ingress buffer full (${this.buffer.size()}/${this.maxLength})`);
                 return {
                     success: false,
                     errorCode: ERROR_CODES.INGRESS_BUFFER_FULL,
@@ -229,7 +235,7 @@ class IngressBuffer {
         } catch (error) {
             return {
                 success: false,
-                errorCode: ERROR_CODES.INGRESS_BUFFER_BUILD_FAILED,
+                errorCode: ERROR_CODES.BUFFER_BUILD_FAILED,
                 error: error
             };
         }
@@ -238,6 +244,7 @@ class IngressBuffer {
     batchExtract(batchSize: number): Response<Message[]> {
         try {
             if (this.buffer.isEmpty()) {
+                // Buffer is empty, this is normal during idle periods
                 return {
                     success: false,
                     errorCode: ERROR_CODES.INGRESS_BUFFER_EMPTY,
@@ -260,6 +267,7 @@ class IngressBuffer {
                 return updateResult;
             }
 
+            console.log(`[IngressBuffer] Extracted ${n} message(s) from ingress buffer (remaining: ${this.buffer.size()})`);
             return {
                 success: true,
                 data: batch
@@ -267,7 +275,7 @@ class IngressBuffer {
         } catch (error) {
             return {
                 success: false,
-                errorCode: ERROR_CODES.INGRESS_BUFFER_BUILD_FAILED,
+                errorCode: ERROR_CODES.BUFFER_BUILD_FAILED,
                 error: error
             };
         }

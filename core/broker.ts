@@ -12,61 +12,72 @@ import fs from "fs";
  */
 class Broker {
     private readonly brokerId: BrokerId;
-    private readonly configLogPath: FilePath;
+    private static readonly configLogPath: FilePath = process.env.CONFIG_LOG_FILE as FilePath;
     private readonly ingressBuffer: IngressBuffer;
     private topics: Map<TopicId, Topic>;
 
     constructor(brokerId: BrokerId) {
+        console.log(`[Broker] Initializing Broker: ${brokerId}`);
         this.brokerId = brokerId;
-        this.configLogPath = process.env.CONFIG_LOG_FILE as FilePath;
         this.ingressBuffer = new IngressBuffer();
         this.topics = new Map<TopicId, Topic>();
         this.setupTopics();
+        console.log(`[Broker] Broker ${brokerId} initialized successfully with ${this.topics.size} topics`);
     }
 
     // Private methods
     private setupTopics(): void {
-        const configLogContent = fs.readFileSync(this.configLogPath, 'utf-8');
+        console.log(`[Broker] Setting up topics from config: ${Broker.configLogPath}`);
+        const configLogContent = fs.readFileSync(Broker.configLogPath, 'utf-8');
         const lines = configLogContent.split("\n").filter(line => {
             const [label] = line?.trim()?.split("|", 1);
-            return label === "topic_label";
+            return label === "topic_config";
         });
 
+        console.log(`[Broker] Found ${lines.length} topic configuration(s)`);
         for (const line of lines) {
             const [_, topicId, topicName, noOfPartitions] = line?.trim()?.split("|", 4) || [];
+            console.log(`[Broker] Creating topic: ${topicName} (ID: ${topicId}) with ${noOfPartitions} partition(s)`);
             this.topics.set(topicId, new Topic(topicId, topicName, Number(noOfPartitions)));
         }
     }
 
+    // Public getter for ingress buffer (used by mock producer)
+    getIngressBuffer(): IngressBuffer {
+        return this.ingressBuffer;
+    }
+
     // Public methods
     async start(): Promise<Response<void>> {
+        console.log(`[Broker] Broker ${this.brokerId} started. Entering main processing loop...`);
+        let cycleCount = 0;
         while (true) {
+            cycleCount++;
             // fetch a batch of messages from the ingress buffer
             const batchResponse = this.ingressBuffer.batchExtract(100);
             if (!batchResponse.success) {
-                return {
-                    success: false,
-                    errorCode: batchResponse.errorCode,
-                    error: batchResponse.error
-                }
+                // Buffer is empty, just continue to next cycle
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                continue;
             }
 
-            // yield back to the event loop (avoid thread blocking)
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            if (batchResponse.data.length > 0) {
+                console.log(`[BROKER] Cycle ${cycleCount}: Extracted ${batchResponse.data.length} message(s) from ingress buffer`);
+            }
 
             // segregate messages according to topics
             for (const message of batchResponse.data) {
                 const topicIdOfMessage = message.topicId;
                 const topic = this.topics.get(topicIdOfMessage);
                 if (!topic) {
-                    return {
-                        success: false,
-                        errorCode: ERROR_CODES.TOPIC_NOT_FOUND,
-                        error: `Topic ${topicIdOfMessage} not found`
-                    }
+                    console.log(`[Broker] Topic ${topicIdOfMessage} not found for message ${message.messageId}`);
+                    continue;
                 }
-                topic.push(message);
+                await topic.push(message);
             }
+
+            // yield back to the event loop (avoid thread blocking)
+            await new Promise((resolve) => setTimeout(resolve, 100));
         }
     }
 }

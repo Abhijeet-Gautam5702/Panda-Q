@@ -143,3 +143,6 @@ pandaq-data/
 
 # Markdown files
 *.md
+
+# Text files
+*.txt

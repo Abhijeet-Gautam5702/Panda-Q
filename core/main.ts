@@ -1,51 +1,76 @@
-import IngressBuffer from "./ingress-buffer.ts";
 import dotenv from "dotenv";
-import ERROR_CODES from "./shared/error-codes.ts";
+import Broker from "./broker.ts";
+import { Bootstrap } from "./bootstrap.ts";
 dotenv.config();
 
-async function main() {
-    console.log("Bootstrapping the server...");
-    // console.log("INGRESS_LOG_FILE:", process.env.INGRESS_LOG_FILE);
-    // console.log("INGRESS_METADATA_FILE:", process.env.INGRESS_METADATA_FILE);
-    // Bootstrap the server
-    // - Check for the log files in the data storage volume
-    // - If log files are present,
-    //      - data match: restore the state of the server
-    //      - data mismatch: refuse to start at all
-    // - If log files are not present, 
-    //      initialize the server with the configuration set in the docker file
-    // - Start the server
-    console.log("Starting the ingress buffer...");
-    const ingressBuffer = new IngressBuffer();
-    console.log("Ingress buffer started successfully.");
+/**
+ * Mock Producer - Simulates message production for testing
+ * Runs every 5 seconds and inserts 5 messages into the ingress buffer
+ */
+function startMockProducer(broker: Broker, topicIds: string[]): void {
+    console.log("\n[Main] Starting mock producer (100 messages every 0.1 seconds)...");
 
-    for (let i = 0; i < 4; i++) {
-        const pushResult = await ingressBuffer.push({
-            topicId: "1",
-            messageId: String(Math.random() + i),
-            content: "Msg --" + Math.random() + "--" + new Date().toLocaleDateString()
-        });
+    let messageCounter = 1;
 
-        if (!pushResult.success) {
-            if (pushResult.errorCode === ERROR_CODES.INGRESS_BUFFER_FULL) {
-                console.log("Ingress Buffer full.");
-                break;
+    setInterval(async () => {
+        console.log(`\n[PRODUCER] Producing 100 messages...`);
+
+        for (let i = 0; i < 100; i++) {
+            // Randomly select a topic
+            const topicId = topicIds[Math.floor(Math.random() * topicIds.length)];
+
+            const message = {
+                topicId,
+                messageId: messageCounter++,
+                content: `Message ${messageCounter - 1} for topic ${topicId} - ${new Date().toISOString()}`
+            };
+
+            const result = await broker.getIngressBuffer().push(message);
+
+            if (result.success) {
+                console.log(`[PRODUCER] ✓ Pushed message ${message.messageId} to topic ${topicId}`);
             } else {
-                console.error("Error pushing message:", pushResult.errorCode, pushResult.error);
-                break;
+                console.error(`[PRODUCER] ✗ Failed to push message: ${result.errorCode}`);
             }
         }
-    }
-    console.log("Ingress Buffer final state:", ingressBuffer.buffer);
-    console.log("Ingress Buffer log-end offset:", ingressBuffer.logEndOffset);
-    console.log("Ingress Buffer read offset:", ingressBuffer.readOffset);
-    console.log("Lag B/W Broker Instance & Ingress Buffer:", ingressBuffer.logEndOffset - ingressBuffer.readOffset);
-    console.log("Ingress Buffer size:", ingressBuffer.buffer.size());
-    // Start the HTTP server
 
-    // Start the broker
-
-    process.exit(0);
+        console.log(`[PRODUCER] Batch complete. Total messages produced: ${messageCounter - 1}\n`);
+    }, 100000);
 }
+
+
+async function main() {
+    try {
+        console.log("Server Start Time: ", process.hrtime.bigint());
+        console.log("====== BOOTSTRAPPING PANDA-Q SERVER ======");
+
+        // Parse configuration and initialize/validate data directory
+        const config = await Bootstrap.bootstrap();
+
+        console.log(`[Main] Configuration validated successfully`);
+        console.log(`[Main] Broker ID: ${config.brokerId}`);
+        console.log(`[Main] Topics configured: ${config.topics.length}`);
+
+        // Start the broker instance
+        const broker = new Broker(config.brokerId);
+
+        // Start mock producer to simulate message production
+        startMockProducer(broker, config.topics.map(t => t.id));
+
+        await broker.start();
+
+    } catch (error) {
+        console.error("\n❌ Bootstrap failed:", error);
+        console.error("\nServer cannot start due to configuration/data directory issues.");
+        process.exit(1);
+    }
+}
+
+process.on("SIGINT", () => {
+    console.log("\n====== SHUTTING DOWN PANDA-Q SERVER ======");
+    console.log("Server End Time: ", process.hrtime.bigint());
+    console.log("Memory Usage: ", process.memoryUsage());
+    process.exit(0);
+});
 
 main().catch(console.error);

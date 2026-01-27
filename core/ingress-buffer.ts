@@ -209,7 +209,7 @@ class IngressBuffer {
                 console.log(`[IngressBuffer] Ingress buffer full (${this.buffer.size()}/${this.maxLength})`);
                 return {
                     success: false,
-                    errorCode: ERROR_CODES.INGRESS_BUFFER_FULL,
+                    errorCode: ERROR_CODES.BUFFER_FULL,
                     error: new Error("Ingress buffer has reached maximum capacity")
                 };
             }
@@ -247,7 +247,7 @@ class IngressBuffer {
                 // Buffer is empty, this is normal during idle periods
                 return {
                     success: false,
-                    errorCode: ERROR_CODES.INGRESS_BUFFER_EMPTY,
+                    errorCode: ERROR_CODES.BUFFER_EMPTY,
                     error: new Error("Ingress buffer is empty")
                 };
             }

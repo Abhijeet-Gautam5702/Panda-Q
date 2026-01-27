@@ -1,8 +1,9 @@
 import IngressBuffer from "./ingress-buffer.ts";
 import ERROR_CODES from "./shared/error-codes.ts";
-import { TopicId, BrokerId, FilePath, Response } from "./shared/types.ts";
+import { TopicId, BrokerId, Response, ConsumerId, PartitionId } from "./shared/types.ts";
 import Topic from "./topic.ts";
-import fs from "fs";
+import { internalTPCMap } from "./main.ts";
+import { writeTPCLog } from "./shared/tpc-helper.ts";
 
 /**
  * Broker Class
@@ -12,7 +13,6 @@ import fs from "fs";
  */
 class Broker {
     private readonly brokerId: BrokerId;
-    private static readonly configLogPath: FilePath = process.env.CONFIG_LOG_FILE as FilePath;
     private topics: Map<TopicId, Topic>;
     readonly ingressBuffer: IngressBuffer;
 
@@ -27,18 +27,13 @@ class Broker {
 
     // Private methods
     private setupTopics(): void {
-        console.log(`[Broker] Setting up topics from config: ${Broker.configLogPath}`);
-        const configLogContent = fs.readFileSync(Broker.configLogPath, 'utf-8');
-        const lines = configLogContent.split("\n").filter(line => {
-            const [label] = line?.trim()?.split("|", 1);
-            return label === "topic_config";
-        });
+        console.log(`[Broker] Setting up topics from TPC Map`);
 
-        console.log(`[Broker] Found ${lines.length} topic configuration(s)`);
-        for (const line of lines) {
-            const [_, topicId, topicName, noOfPartitions] = line?.trim()?.split("|", 4) || [];
-            console.log(`[Broker] Creating topic: ${topicName} (ID: ${topicId}) with ${noOfPartitions} partition(s)`);
-            this.topics.set(topicId, new Topic(topicId, topicName, Number(noOfPartitions)));
+        // Use internalTPCMap instead of config file
+        for (const [topicId, partitionMap] of internalTPCMap) {
+            const noOfPartitions = partitionMap.size;
+            console.log(`[Broker] Creating topic: ${topicId} with ${noOfPartitions} partition(s)`);
+            this.topics.set(topicId, new Topic(topicId, noOfPartitions));
         }
     }
 
@@ -74,6 +69,69 @@ class Broker {
             // yield back to the event loop (avoid thread blocking)
             await new Promise((resolve) => setTimeout(resolve, 100));
         }
+    }
+
+    async registerConsumer(topicId: TopicId, consumerId: ConsumerId): Promise<Response<{ partitionId: PartitionId }>> {
+        try {
+            const partitionMap = internalTPCMap.get(topicId);
+            if (!partitionMap) {
+                return {
+                    success: false,
+                    errorCode: ERROR_CODES.TOPIC_NOT_FOUND,
+                    error: new Error(`Topic ${topicId} not found in TPC Map`)
+                };
+            }
+
+            // Find an unassigned partition or the partition with this consumer
+            let assignedPartitionId: PartitionId | null = null;
+
+            // First, check if consumer is already assigned to a partition
+            for (const [partitionId, existingConsumerId] of partitionMap) {
+                if (existingConsumerId === consumerId) {
+                    assignedPartitionId = partitionId;
+                    break;
+                }
+            }
+
+            // If not already assigned, find an empty partition
+            if (assignedPartitionId === null) {
+                for (const [partitionId, existingConsumerId] of partitionMap) {
+                    if (existingConsumerId === "") {
+                        assignedPartitionId = partitionId;
+                        partitionMap.set(partitionId, consumerId);
+
+                        // Persist TPC Map to TPC.log
+                        writeTPCLog(internalTPCMap);
+
+                        console.log(`[Broker] Consumer ${consumerId} assigned to partition ${partitionId} for topic ${topicId}`);
+                        break;
+                    }
+                }
+            }
+
+            if (assignedPartitionId === null) {
+                return {
+                    success: false,
+                    errorCode: ERROR_CODES.NO_PARTITION_AVAILABLE,
+                    error: new Error(`No available partition for topic ${topicId}`)
+                };
+            }
+
+            return {
+                success: true,
+                data: { partitionId: assignedPartitionId }
+            };
+        } catch (error) {
+            return {
+                success: false,
+                errorCode: ERROR_CODES.UNKNOWN_ERROR,
+                error: error
+            };
+        }
+    }
+
+    getTopic(topicId: TopicId): Topic | undefined {
+        return this.topics.get(topicId);
     }
 }
 

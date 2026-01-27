@@ -1,25 +1,20 @@
 import { createHash } from "node:crypto";
 import Partition from "./partition.ts";
-import MockConsumer from "./consumer.ts";
 import ERROR_CODES from "./shared/error-codes.ts";
 import { Message, PartitionId, Response, TopicId } from "./shared/types.ts";
 
 class Topic {
     private readonly topicId: TopicId;
-    private readonly topicName: string;
     private readonly noOfPartitions: number;
     private partitions: Map<PartitionId, Partition>;
-    // private consumers: MockConsumer[];
 
-    constructor(topicId: TopicId, topicName: string, noOfPartitions: number) {
-        console.log(`[Topic] Initializing Topic: ${topicName} (ID: ${topicId})`);
+    constructor(topicId: TopicId, noOfPartitions: number) {
+        console.log(`[Topic] Initializing Topic: ${topicId}`);
         this.topicId = topicId;
-        this.topicName = topicName;
         this.noOfPartitions = noOfPartitions;
         this.partitions = new Map<PartitionId, Partition>();
-        // this.consumers = [];
         this.setupPartitions();
-        console.log(`[Topic] Topic ${topicName} initialized with ${noOfPartitions} partition(s)`);
+        console.log(`[Topic] Topic ${topicId} initialized with ${noOfPartitions} partition(s)`);
     }
 
     private async setupPartitions(): Promise<void> {
@@ -27,25 +22,13 @@ class Topic {
         for (let i = 0; i < this.noOfPartitions; i++) {
             this.partitions.set(i, new Partition(i, this.topicId));
         }
-
-        // Create and start one consumer per partition
-        // console.log(`[Topic] Starting ${this.noOfPartitions} consumer(s) for topic ${this.topicName}`);
-        // for (let i = 0; i < this.noOfPartitions; i++) {
-        //     const partition = this.partitions.get(i);
-        //     if (partition) {
-        //         const consumerId = `consumer_${this.topicId}_p${i}`;
-        //         const consumer = new MockConsumer(consumerId, partition, this.topicId, i);
-        //         this.consumers.push(consumer);
-        //         consumer.start(); // Start consumer in background
-        //     }
-        // }
     }
 
-    private assignPartition(messageId: number): Response<PartitionId> {
+    private assignPartition(messageId: string): Response<PartitionId> {
         try {
-            // Generate a secure hash of the messageId
+            // Generate a secure hash of the string messageId
             const hash = createHash('sha256')
-                .update(messageId.toString())
+                .update(messageId)
                 .digest('hex');
 
             // Convert hash to a number for partition assignment
@@ -92,6 +75,10 @@ class Topic {
         }
         console.log(`[Topic] Pushing message ${message.messageId} to topic ${this.topicId}, partition ${partitionId}`);
         return await partition.push(message);
+    }
+
+    getPartition(partitionId: PartitionId): Partition | undefined {
+        return this.partitions.get(partitionId);
     }
 }
 

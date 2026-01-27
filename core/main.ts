@@ -2,43 +2,16 @@ import dotenv from "dotenv";
 import Broker from "./broker.ts";
 import { Bootstrap } from "./bootstrap.ts";
 import Server from "./server.ts";
+import { ConsumerId, PartitionId, TopicId } from "./shared/types.ts";
 dotenv.config();
 
 /**
- * Mock Producer - Simulates message production for testing
- * Runs every 5 seconds and inserts 5 messages into the ingress buffer
+ * Internal Topic-Partition-Consumer Map
+ * 
+ * This map is used to maintain the mapping of topics to partitions and consumers.
+ * It is used to determine which consumer should consume a message from a partition.
  */
-function startMockProducer(broker: Broker, topicIds: string[]): void {
-    console.log("\n[Main] Starting mock producer (100 messages every 0.1 seconds)...");
-
-    let messageCounter = 1;
-
-    setInterval(async () => {
-        console.log(`\n[PRODUCER] Producing 100 messages...`);
-
-        for (let i = 0; i < 100; i++) {
-            // Randomly select a topic
-            const topicId = topicIds[Math.floor(Math.random() * topicIds.length)];
-
-            const message = {
-                topicId,
-                messageId: messageCounter++,
-                content: `Message ${messageCounter - 1} for topic ${topicId} - ${new Date().toISOString()}`
-            };
-
-            const result = await broker.getIngressBuffer().push(message);
-
-            if (result.success) {
-                console.log(`[PRODUCER] ✓ Pushed message ${message.messageId} to topic ${topicId}`);
-            } else {
-                console.error(`[PRODUCER] ✗ Failed to push message: ${result.errorCode}`);
-            }
-        }
-
-        console.log(`[PRODUCER] Batch complete. Total messages produced: ${messageCounter - 1}\n`);
-    }, 100);
-}
-
+export const internalTPCMap = new Map<TopicId, Map<PartitionId, ConsumerId>>();
 
 async function main() {
     try {
@@ -63,13 +36,10 @@ async function main() {
         console.log(`[Main] HTTP Server started on port ${port}`);
         console.log(`[Main] Starting broker processing loop...`);
 
-        // Start mock producer to simulate message production
-        // startMockProducer(broker, config.topics.map(t => t.id));
-
         await broker.start();
 
     } catch (error) {
-        console.error("\n❌ Bootstrap failed:", error);
+        console.error("\nBootstrap failed:", error);
         console.error("\nServer cannot start due to configuration/data directory issues.");
         process.exit(1);
     }

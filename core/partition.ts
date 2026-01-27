@@ -106,7 +106,7 @@ class Partition {
                 // Only load messages for this specific partition
                 this.buffer.enqueue({
                     topicId,
-                    messageId: Number(messageId),
+                    messageId: messageId, // messageId is now a string
                     content
                 });
             }
@@ -249,7 +249,7 @@ class Partition {
             if (this.buffer.size() >= this.maxBufferSize) {
                 return {
                     success: false,
-                    errorCode: ERROR_CODES.INGRESS_BUFFER_FULL,
+                    errorCode: ERROR_CODES.BUFFER_FULL,
                     error: new Error(`Partition ${this.partitionId} buffer has reached maximum capacity`)
                 };
             }
@@ -286,7 +286,7 @@ class Partition {
             if (this.buffer.isEmpty()) {
                 return {
                     success: false,
-                    errorCode: ERROR_CODES.INGRESS_BUFFER_EMPTY,
+                    errorCode: ERROR_CODES.BUFFER_EMPTY,
                     error: new Error(`Partition ${this.partitionId} buffer is empty`)
                 };
             }
@@ -301,10 +301,11 @@ class Partition {
                 }
             }
 
-            const updateResult = this.updateReadOffset(this.readOffset + n);
-            if (!updateResult.success) {
-                return updateResult;
-            }
+            // Note: readOffset should be updated by the consumer only (via HTTP /commit endpoint)
+            // const updateResult = this.updateReadOffset(this.readOffset + n);
+            // if (!updateResult.success) {
+            //     return updateResult;
+            // }
 
             return {
                 success: true,
@@ -314,6 +315,39 @@ class Partition {
             return {
                 success: false,
                 errorCode: ERROR_CODES.BUFFER_BUILD_FAILED,
+                error: error
+            };
+        }
+    }
+
+    commitOffset(offset: number): Response<{ logEndOffset: number; newReadOffset: number }> {
+        try {
+            // Validate that logEndOffset >= offset
+            if (this.logEndOffset < offset) {
+                return {
+                    success: false,
+                    errorCode: ERROR_CODES.INVALID_OFFSET,
+                    error: new Error(`Invalid offset: ${offset} exceeds logEndOffset: ${this.logEndOffset}`)
+                };
+            }
+
+            // Update readOffset
+            const updateResult = this.updateReadOffset(offset);
+            if (!updateResult.success) {
+                return updateResult as Response<{ logEndOffset: number; newReadOffset: number }>;
+            }
+
+            return {
+                success: true,
+                data: {
+                    logEndOffset: this.logEndOffset,
+                    newReadOffset: this.readOffset
+                }
+            };
+        } catch (error) {
+            return {
+                success: false,
+                errorCode: ERROR_CODES.UNKNOWN_ERROR,
                 error: error
             };
         }

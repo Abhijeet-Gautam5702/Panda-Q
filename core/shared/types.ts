@@ -1,10 +1,11 @@
 export type PartitionId = number;
 export type TopicId = string;
 export type BrokerId = string;
+export type ConsumerId = string;
 
 export type Message = {
     topicId: TopicId;
-    messageId: number;
+    messageId: string;
     content: string;
 }
 

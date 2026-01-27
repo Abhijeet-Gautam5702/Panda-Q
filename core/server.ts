@@ -1,12 +1,13 @@
 import express, { Request, Response } from 'express';
 import Broker from './broker.ts';
-import { Message, TopicId, BrokerId, PartitionId } from './shared/types.ts';
+import { Message, TopicId } from './shared/types.ts';
+import { internalTPCMap } from './main.ts';
+import { writeTPCLog } from './shared/tpc-helper.ts';
 
 /**
  * HTTP Server for Panda-Q Broker
  * 
  * Exposes REST API endpoints for producers and consumers to interact with the broker.
- * Supports basic authentication for secure communication.
  */
 class Server {
     private readonly app: express.Application;
@@ -31,6 +32,45 @@ class Server {
     }
 
     private setupRoutes(): void {
+        // Consumer registration: POST /register/:topicId
+        this.app.post('/register/:topicId', async (req, res) => {
+            try {
+                const { topicId } = req.params;
+                const { brokerId, consumerId } = req.body;
+
+                if (!topicId || !brokerId || !consumerId) {
+                    return res.status(400).json({
+                        success: false,
+                        error: 'Invalid consumer registration format. Expected { topicId, brokerId, consumerId }'
+                    });
+                }
+
+                // Register consumer with broker
+                const result = await this.broker.registerConsumer(topicId, consumerId);
+
+                if (!result.success) {
+                    return res.status(500).json(result);
+                }
+
+                res.status(200).json({
+                    success: true,
+                    data: {
+                        topicId,
+                        brokerId,
+                        consumerId,
+                        partitionId: result.data.partitionId,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            } catch (error) {
+                console.error('[SERVER] Error in /register endpoint:', error);
+                res.status(500).json({
+                    success: false,
+                    error: 'Internal server error'
+                });
+            }
+        })
+
         // Producer endpoint: POST /ingress/:topicId
         this.app.post('/ingress/:topicId', async (req, res) => {
             try {
@@ -47,7 +87,7 @@ class Server {
                 // Create message object matching internal format
                 const internalMessage: Message = {
                     topicId: topicId as TopicId,
-                    messageId: message.messageId,
+                    messageId: String(message.messageId), // Ensure messageId is string
                     content: message.content
                 };
 
@@ -84,7 +124,6 @@ class Server {
                 const isBatch = b === 't' || b === 'true';
 
                 // TODO: Implement actual consumption logic from partition
-                // For now, return a placeholder response
                 console.log(`[SERVER] Consume request - Broker: ${brokerId}, Topic: ${topicId}, Partition: ${partitionId}, Batch: ${isBatch}`);
 
                 // Placeholder response
@@ -111,21 +150,72 @@ class Server {
             try {
                 const { brokerId, topicId, partitionId, consumerId, offset } = req.body;
 
-                if (typeof offset !== 'number') {
+                if (typeof offset !== 'number' || !topicId || !consumerId || partitionId === undefined) {
                     return res.status(400).json({
                         success: false,
-                        error: 'Invalid offset value'
+                        error: 'Invalid commit format. Expected { brokerId, topicId, partitionId, consumerId, offset }'
                     });
                 }
 
-                // TODO: Implement actual offset commit logic
-                console.log(`[SERVER] Commit offset - Broker: ${brokerId}, Topic: ${topicId}, Partition: ${partitionId}, Consumer: ${consumerId}, Offset: ${offset}`);
+                // Validate topic exists in TPC Map
+                const partitionMap = internalTPCMap.get(topicId);
+                if (!partitionMap) {
+                    return res.status(404).json({
+                        success: false,
+                        error: `Topic ${topicId} not found`
+                    });
+                }
 
-                res.json({
+                // Validate partition exists
+                const partitionIdNum = Number(partitionId);
+                if (!partitionMap.has(partitionIdNum)) {
+                    return res.status(404).json({
+                        success: false,
+                        error: `Partition ${partitionId} not found in topic ${topicId}`
+                    });
+                }
+
+                // Get the partition from broker
+                const topic = this.broker.getTopic(topicId);
+                if (!topic) {
+                    return res.status(404).json({
+                        success: false,
+                        error: `Topic ${topicId} not found in broker`
+                    });
+                }
+
+                const partition = topic.getPartition(partitionIdNum);
+                if (!partition) {
+                    return res.status(404).json({
+                        success: false,
+                        error: `Partition ${partitionIdNum} not found in topic ${topicId}`
+                    });
+                }
+
+                // Commit offset - validates logEndOffset >= offset and updates readOffset
+                const commitResult = partition.commitOffset(offset);
+                if (!commitResult.success) {
+                    return res.status(400).json(commitResult);
+                }
+
+                // Update TPC Map with consumer assignment
+                partitionMap.set(partitionIdNum, consumerId);
+
+                // Persist TPC Map to TPC.log
+                writeTPCLog(internalTPCMap);
+
+                console.log(`[SERVER] Commit offset - Topic: ${topicId}, Partition: ${partitionId}, Consumer: ${consumerId}, Offset: ${offset}`);
+
+                res.status(200).json({
                     success: true,
                     data: {
                         committed: true,
                         offset,
+                        topicId,
+                        partitionId: partitionIdNum,
+                        consumerId,
+                        logEndOffset: commitResult.data.logEndOffset,
+                        newReadOffset: commitResult.data.newReadOffset,
                         timestamp: new Date().toISOString()
                     }
                 });
@@ -143,6 +233,7 @@ class Server {
         this.app.listen(this.port, () => {
             console.log(`[SERVER] Panda-Q HTTP Server listening on port ${this.port}`);
             console.log(`[SERVER] Endpoints available:`);
+            console.log(`[SERVER]   - POST /register/:topicId`);
             console.log(`[SERVER]   - POST /ingress/:topicId`);
             console.log(`[SERVER]   - GET /consume/:brokerId/:topicId/:partitionId`);
             console.log(`[SERVER]   - POST /commit`);

@@ -1,9 +1,10 @@
 import fs from "fs";
 import path from "path";
+import { internalTPCMap } from "./main.ts";
+import { readTPCLog, writeTPCLog, tpcLogExists } from "./shared/tpc-helper.ts";
 
 interface TopicConfig {
     id: string;
-    name: string;
     partitions: number;
 }
 
@@ -53,30 +54,67 @@ export class Bootstrap {
                 reboot = value === 'true';
             }
 
-            // Start of a new topic
+            // Start of a new topic (detect topic-level - ID:)
             if (trimmed.startsWith('- ID:')) {
-                if (currentTopic && currentTopic.id && currentTopic.name && currentTopic.partitions) {
+                // Save previous topic
+                if (currentTopic && currentTopic.id && currentTopic.partitions) {
                     topics.push(currentTopic as TopicConfig);
                 }
                 currentTopic = { id: trimmed.split(':')[1].trim() };
             }
-            // Parse topic name
+            // Parse topic name (ignored, kept for backward compatibility)
             else if (trimmed.startsWith('name:') && currentTopic) {
-                currentTopic.name = trimmed.split(':')[1].trim();
+                // name field is ignored
             }
-            // Parse topic partitions
+            // Parse topic partitions (simple integer format)
             else if (trimmed.startsWith('partitions:') && currentTopic) {
-                currentTopic.partitions = parseInt(trimmed.split(':')[1].trim());
+                const partitionValue = trimmed.split(':')[1].trim();
+                currentTopic.partitions = parseInt(partitionValue);
             }
         }
 
         // Add last topic
-        if (currentTopic && currentTopic.id && currentTopic.name && currentTopic.partitions) {
+        if (currentTopic && currentTopic.id && currentTopic.partitions) {
             topics.push(currentTopic as TopicConfig);
         }
 
         console.log(`[Bootstrap] Parsed config - Broker: ${brokerId}, Topics: ${topics.length}, Reboot: ${reboot}`);
         return { brokerId, topics, reboot };
+    }
+
+    /**
+     * Populate the internal TPC Map from TPC.log (if exists) or from config
+     */
+    static populateTPCMap(config: BrokerConfig): void {
+        console.log("[Bootstrap] Populating TPC Map...");
+
+        // Try to load from TPC.log first
+        if (tpcLogExists()) {
+            console.log("[Bootstrap] Found existing TPC.log, loading from file...");
+            const loadedMap = readTPCLog();
+            if (loadedMap) {
+                // Copy the loaded map to the global internalTPCMap
+                for (const [topicId, partitionMap] of loadedMap) {
+                    internalTPCMap.set(topicId, partitionMap);
+                }
+                console.log(`[Bootstrap] TPC Map restored from TPC.log with ${internalTPCMap.size} topic(s)`);
+                return;
+            }
+        }
+
+        // Fall back to populating from config if TPC.log doesn't exist
+        console.log("[Bootstrap] No TPC.log found, populating from config...");
+        for (const topic of config.topics) {
+            const partitionMap = new Map<number, string>();
+            for (let i = 0; i < topic.partitions; i++) {
+                partitionMap.set(i, ""); // Empty consumer ID initially
+            }
+            internalTPCMap.set(topic.id, partitionMap);
+        }
+
+        // Write the new TPC Map to TPC.log
+        writeTPCLog(internalTPCMap);
+        console.log(`[Bootstrap] TPC Map populated with ${internalTPCMap.size} topic(s) and saved to TPC.log`);
     }
 
     /**
@@ -161,6 +199,9 @@ export class Bootstrap {
             this.initializeDataDirectory(config);
         }
 
+        // Populate TPC Map after initialization/validation
+        this.populateTPCMap(config);
+
         return config;
     }
 
@@ -177,7 +218,7 @@ export class Bootstrap {
         const lines: string[] = [];
 
         for (const topic of config.topics) {
-            lines.push(`topic_config|${topic.id}|${topic.name}|${topic.partitions}`);
+            lines.push(`topic_config|${topic.id}|${topic.partitions}`);
         }
 
         fs.writeFileSync(configPath, lines.join('\n') + '\n');
@@ -199,7 +240,7 @@ export class Bootstrap {
         // Create topic-specific partition metadata file
         this.initializeFile(path.join(topicDir, `${topic.id}_partition_metadata.log`));
 
-        console.log(`[Bootstrap] Initialized topic ${topic.name} (${topic.id}) with ${topic.partitions} partition(s)`);
+        console.log(`[Bootstrap] Initialized topic ${topic.id} with ${topic.partitions} partition(s)`);
     }
 
     private static validateConfigLog(dataDir: string, config: BrokerConfig): void {
@@ -217,7 +258,7 @@ export class Bootstrap {
         }
 
         for (const topic of config.topics) {
-            const expectedLine = `topic_config|${topic.id}|${topic.name}|${topic.partitions}`;
+            const expectedLine = `topic_config|${topic.id}|${topic.partitions}`;
             if (!lines.includes(expectedLine)) {
                 throw new Error(`Config mismatch: Topic ${topic.id} configuration doesn't match. Expected: ${expectedLine}`);
             }

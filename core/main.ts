@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import Broker from "./broker.ts";
 import { Bootstrap } from "./bootstrap.ts";
+import Server from "./server.ts";
 dotenv.config();
 
 /**
@@ -35,7 +36,7 @@ function startMockProducer(broker: Broker, topicIds: string[]): void {
         }
 
         console.log(`[PRODUCER] Batch complete. Total messages produced: ${messageCounter - 1}\n`);
-    }, 100000);
+    }, 100);
 }
 
 
@@ -54,8 +55,16 @@ async function main() {
         // Start the broker instance
         const broker = new Broker(config.brokerId);
 
+        // Start HTTP server to accept producer/consumer connections
+        const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+        const server = new Server(broker, port);
+        server.start();
+
+        console.log(`[Main] HTTP Server started on port ${port}`);
+        console.log(`[Main] Starting broker processing loop...`);
+
         // Start mock producer to simulate message production
-        startMockProducer(broker, config.topics.map(t => t.id));
+        // startMockProducer(broker, config.topics.map(t => t.id));
 
         await broker.start();
 

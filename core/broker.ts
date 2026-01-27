@@ -13,8 +13,8 @@ import fs from "fs";
 class Broker {
     private readonly brokerId: BrokerId;
     private static readonly configLogPath: FilePath = process.env.CONFIG_LOG_FILE as FilePath;
-    private readonly ingressBuffer: IngressBuffer;
     private topics: Map<TopicId, Topic>;
+    readonly ingressBuffer: IngressBuffer;
 
     constructor(brokerId: BrokerId) {
         console.log(`[Broker] Initializing Broker: ${brokerId}`);
@@ -40,11 +40,6 @@ class Broker {
             console.log(`[Broker] Creating topic: ${topicName} (ID: ${topicId}) with ${noOfPartitions} partition(s)`);
             this.topics.set(topicId, new Topic(topicId, topicName, Number(noOfPartitions)));
         }
-    }
-
-    // Public getter for ingress buffer (used by mock producer)
-    getIngressBuffer(): IngressBuffer {
-        return this.ingressBuffer;
     }
 
     // Public methods

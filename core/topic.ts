@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import Partition from "./partition.ts";
-import ERROR_CODES from "./shared/error-codes.ts";
-import { Message, PartitionId, Response, TopicId } from "./shared/types.ts";
+import Partition from "./partition.js";
+import ERROR_CODES from "./shared/error-codes.js";
+import { Message, PartitionId, Response, TopicId } from "./shared/types.js";
 
 class Topic {
     private readonly topicId: TopicId;

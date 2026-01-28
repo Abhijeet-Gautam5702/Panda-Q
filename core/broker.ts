@@ -1,9 +1,9 @@
-import IngressBuffer from "./ingress-buffer.ts";
-import ERROR_CODES from "./shared/error-codes.ts";
-import { TopicId, BrokerId, Response, ConsumerId, PartitionId } from "./shared/types.ts";
-import Topic from "./topic.ts";
-import { internalTPCMap } from "./main.ts";
-import { writeTPCLog } from "./shared/tpc-helper.ts";
+import IngressBuffer from "./ingress-buffer.js";
+import ERROR_CODES from "./shared/error-codes.js";
+import { TopicId, BrokerId, Response, ConsumerId, PartitionId } from "./shared/types.js";
+import Topic from "./topic.js";
+import { internalTPCMap } from "./main.js";
+import { writeTPCLog } from "./shared/tpc-helper.js";
 
 /**
  * Broker Class

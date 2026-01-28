@@ -1,9 +1,9 @@
 import fs from "fs";
-import LogFileHandler from "./shared/log-file-handler.ts";
-import Queue from "./shared/queue.ts";
-import ERROR_CODES from "./shared/error-codes.ts";
-import { FilePath, LOG_FILE_TYPE, Message, PartitionId, Response } from "./shared/types.ts";
-import { ensureFileExists } from "./shared/utils.ts";
+import LogFileHandler from "./shared/log-file-handler.js";
+import Queue from "./shared/queue.js";
+import ERROR_CODES from "./shared/error-codes.js";
+import { FilePath, LOG_FILE_TYPE, Message, PartitionId, Response } from "./shared/types.js";
+import { ensureFileExists } from "./shared/utils.js";
 
 /**
  * Partition

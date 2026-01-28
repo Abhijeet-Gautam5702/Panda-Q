@@ -1,8 +1,9 @@
 import dotenv from "dotenv";
-import Broker from "./broker.ts";
-import { Bootstrap } from "./bootstrap.ts";
-import Server from "./server.ts";
-import { ConsumerId, PartitionId, TopicId } from "./shared/types.ts";
+import Broker from "./broker.js";
+import { Bootstrap } from "./bootstrap.js";
+import Server from "./server.js";
+import { ConsumerId, PartitionId, TopicId } from "./shared/types.js";
+import getEnv from "./shared/env-config.js";
 dotenv.config();
 
 /**
@@ -29,14 +30,13 @@ async function main() {
         const broker = new Broker(config.brokerId);
 
         // Start HTTP server to accept producer/consumer connections
-        const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+        const port = getEnv().PORT ? parseInt(getEnv().PORT) : 3000;
         const server = new Server(broker, port);
         server.start();
 
         console.log(`[Main] HTTP Server started on port ${port}`);
-        console.log(`[Main] Starting broker processing loop...`);
-
-        await broker.start();
+        // console.log(`[Main] Starting broker processing loop...`);
+        // await broker.start();
 
     } catch (error) {
         console.error("\nBootstrap failed:", error);

@@ -1,4 +1,4 @@
-import { BrokerId, ConsumerId, ConsumptionResponse, Message, PartitionId, Response, TopicId } from "./types";
+import { BrokerId, ConsumerId, ConsumptionResponse, PartitionId, Response, TopicId } from "./types.js";
 
 /**
  * Consumer client for consuming messages from a Panda-Q broker partition.

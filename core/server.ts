@@ -1,8 +1,8 @@
 import express, { Request, Response } from 'express';
-import Broker from './broker.ts';
-import { Message, TopicId } from './shared/types.ts';
-import { internalTPCMap } from './main.ts';
-import { writeTPCLog } from './shared/tpc-helper.ts';
+import Broker from './broker.js';
+import { Message, TopicId } from './shared/types.js';
+import { internalTPCMap } from './main.js';
+import { writeTPCLog } from './shared/tpc-helper.js';
 
 /**
  * HTTP Server for Panda-Q Broker
@@ -77,6 +77,8 @@ class Server {
                 const { topicId } = req.params;
                 const { brokerId, message } = req.body;
 
+                // TODO: Validate the brokerId and topicId exists or not
+
                 if (!message || !message.messageId || !message.content) {
                     return res.status(400).json({
                         success: false,
@@ -92,6 +94,7 @@ class Server {
                 };
 
                 // Push message to ingress buffer
+                console.log("DEBUG | SERVER | pushing into ingress buffer")
                 const result = await this.broker.ingressBuffer.push(internalMessage);
 
                 if (!result.success) {
@@ -232,11 +235,6 @@ class Server {
     start(): void {
         this.app.listen(this.port, () => {
             console.log(`[SERVER] Panda-Q HTTP Server listening on port ${this.port}`);
-            console.log(`[SERVER] Endpoints available:`);
-            console.log(`[SERVER]   - POST /register/:topicId`);
-            console.log(`[SERVER]   - POST /ingress/:topicId`);
-            console.log(`[SERVER]   - GET /consume/:brokerId/:topicId/:partitionId`);
-            console.log(`[SERVER]   - POST /commit`);
         });
     }
 }

@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
-import { internalTPCMap } from "./main.ts";
-import { readTPCLog, writeTPCLog, tpcLogExists } from "./shared/tpc-helper.ts";
+import { internalTPCMap } from "./main.js";
+import { readTPCLog, writeTPCLog, tpcLogExists } from "./shared/tpc-helper.js";
 
 interface TopicConfig {
     id: string;

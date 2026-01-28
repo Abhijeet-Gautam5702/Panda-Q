@@ -1,4 +1,4 @@
-import { BrokerId, Message, TopicId, Response } from "./types";
+import { BrokerId, TopicId, Response } from "./types.js";
 
 /**
  * Producer client for sending messages to a Panda-Q broker.
@@ -79,12 +79,14 @@ class Producer {
      * @throws {Error} Throws if the message is null or undefined
      */
     async produce(message: {
-        messageId: number;
+        messageId: string;
         content: any;
     }): Promise<Response<any>> {
         if (!message) {
             throw new Error("Invalid Message");
         }
+        // TODO: Validate the topicId of the producer exists in the TPC or not?
+        // Create an endpoint to check for TPC map
         try {
             const content = message.content;
             const payload = {

@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
-import ERROR_CODES from "./error-codes.ts";
-import { FilePath, ValidationResult } from "./types.ts";
+import ERROR_CODES from "./error-codes.js";
+import { FilePath, ValidationResult } from "./types.js";
 
 /**
  * Ensures a directory exists at the given path.

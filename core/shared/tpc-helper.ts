@@ -1,12 +1,13 @@
 import fs from "fs";
 import path from "path";
-import { TopicId, PartitionId, ConsumerId } from "./types.ts";
+import { TopicId, PartitionId, ConsumerId } from "./types.js";
+import getEnv from "./env-config.js";
 
 
 const TPC_LOG_FILE = "TPC.log";
 
 export function getTPCLogPath(): string {
-    const dataDir = process.env.DATA_STORAGE_VOLUME || "pandaq-data";
+    const dataDir = getEnv().DATA_STORAGE_VOLUME || "pandaq-data";
     return path.join(process.cwd(), dataDir, TPC_LOG_FILE);
 }
 

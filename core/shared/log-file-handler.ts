@@ -1,8 +1,9 @@
 import { promises as fs } from 'fs';
-import ERROR_CODES from "./error-codes.ts";
-import { ensureFileExists } from "./utils.ts";
-import { FilePath, Message, BrokerId, LOG_FILE_TYPE, Response } from "./types.ts";
+import ERROR_CODES from "./error-codes.js";
+import { ensureFileExists } from "./utils.js";
+import { FilePath, Message, BrokerId, LOG_FILE_TYPE, Response } from "./types.js";
 import dotenv from "dotenv";
+import getEnv from './env-config.js';
 dotenv.config();
 
 // Log File Handler
@@ -11,8 +12,7 @@ class LogFileHandler {
     private readonly filePath: FilePath;
     private readonly topicId?: string;
     private readonly partitionId?: number;
-    private static readonly dataStorageVolume: FilePath = process.env.DATA_STORAGE_VOLUME as FilePath;
-    private static readonly brokerId: BrokerId = process.env.BROKER_ID as BrokerId;
+    private static readonly brokerId: BrokerId = getEnv().BROKER_ID as BrokerId;
 
     constructor(config: {
         label: LOG_FILE_TYPE,

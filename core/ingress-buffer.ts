@@ -1,10 +1,11 @@
-import Queue from "./shared/queue.ts";
-import ERROR_CODES from "./shared/error-codes.ts";
-import LogFileHandler from "./shared/log-file-handler.ts";
-import { ensureFileExists } from "./shared/utils.ts";
-import { Message, FilePath, TopicId, LOG_FILE_TYPE, Response } from "./shared/types.ts";
+import Queue from "./shared/queue.js";
+import ERROR_CODES from "./shared/error-codes.js";
+import LogFileHandler from "./shared/log-file-handler.js";
+import { ensureFileExists } from "./shared/utils.js";
+import { Message, FilePath, TopicId, LOG_FILE_TYPE, Response } from "./shared/types.js";
 import fs from "fs";
 import dotenv from "dotenv"
+import getEnv from "./shared/env-config.js";
 dotenv.config();
 
 /**
@@ -27,8 +28,8 @@ dotenv.config();
 class IngressBuffer {
     public buffer: Queue<Message>;
     private maxLength: number = 200_000_000;
-    private static readonly logFilePath: FilePath = process.env.INGRESS_LOG_FILE as FilePath;
-    private static readonly metadataFilePath: FilePath = process.env.INGRESS_METADATA_FILE as FilePath;
+    private static readonly logFilePath: FilePath = getEnv().INGRESS_LOG_FILE as FilePath;
+    private static readonly metadataFilePath: FilePath = getEnv().INGRESS_METADATA_FILE as FilePath;
     logEndOffset: number = 0;
     readOffset: number = 0;
     private readonly logHandler: LogFileHandler;
@@ -92,7 +93,7 @@ class IngressBuffer {
                 const [brokerId, offset, topicId, messageId, content] = log.split("|");
                 this.buffer.enqueue({
                     topicId,
-                    messageId: Number(messageId),
+                    messageId,
                     content
                 });
             }

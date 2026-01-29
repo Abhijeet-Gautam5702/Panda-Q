@@ -25,8 +25,8 @@ class Server {
     private setupMiddleware(): void {
         this.app.use(express.json());
         // Request Access Logs
-        this.app.use((req, res, next) => {
-            console.log(`[SERVER] ${req.method} ${req.path}`);
+        this.app.use((req, _, next) => {
+            console.log(`[ACCESS] ${req.method} ${req.path}`);
             next();
         });
     }

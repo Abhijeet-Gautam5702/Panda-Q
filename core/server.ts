@@ -138,7 +138,7 @@ class Server {
                     }
                 };
 
-                res.json(response);
+                res.status(200).json(response);
             } catch (error) {
                 console.error('[SERVER] Error in /consume endpoint:', error);
                 res.status(500).json({

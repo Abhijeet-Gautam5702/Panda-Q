@@ -36,7 +36,7 @@ async function main() {
 
         console.log(`[Main] HTTP Server started on port ${port}`);
         // console.log(`[Main] Starting broker processing loop...`);
-        // await broker.start();
+        await broker.start();
 
     } catch (error) {
         console.error("\nBootstrap failed:", error);

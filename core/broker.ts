@@ -88,6 +88,7 @@ class Broker {
             // First, check if consumer is already assigned to a partition
             for (const [partitionId, existingConsumerId] of partitionMap) {
                 if (existingConsumerId === consumerId) {
+                    console.log("Consumer Already Registered With Partition:", partitionId)
                     assignedPartitionId = partitionId;
                     break;
                 }

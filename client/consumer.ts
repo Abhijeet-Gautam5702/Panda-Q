@@ -48,7 +48,7 @@ class Consumer {
     private readonly brokerId: BrokerId;
     private readonly consumerId: ConsumerId;
     private readonly topicId: TopicId;
-    private readonly partitionId: PartitionId;
+    private partitionId: PartitionId = '';
     private readonly username?: string;
     private readonly password?: string;
 
@@ -57,7 +57,6 @@ class Consumer {
         brokerId: BrokerId,
         consumerId: ConsumerId,
         topicId: TopicId,
-        partitionId: PartitionId,
         username?: string,
         password?: string
     ) {
@@ -65,14 +64,61 @@ class Consumer {
         this.brokerId = brokerId;
         this.topicId = topicId;
         this.consumerId = consumerId;
-        this.partitionId = partitionId;
+        // this.partitionId = partitionId;
         this.username = username;
         this.password = password;
+
+        this.registerConsumer();
+    }
+
+    private async registerConsumer(): Promise<Response<any>> {
+        if (this.partitionId) {
+            return {
+                success: true,
+                data: null
+            }
+        }
+        try {
+            let url = `${this.brokerUrl}/register/${this.topicId}`;
+            const headers: Record<string, string> = {
+                "Content-Type": "application/json"
+            }
+            if (this.username && this.password) {
+                const credentials = Buffer.from(`${this.username}:${this.password}`).toString('base64');
+                headers['Authorization'] = `Basic ${credentials}`;
+            }
+
+            const response = await fetch(url, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                    brokerId: this.brokerId,
+                    consumerId: this.consumerId
+                })
+            });
+            if (response.status !== 200) {
+                throw new Error(`Failed to register consumer: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            this.partitionId = data.data?.partitionId;
+
+            return {
+                success: true,
+                data: null
+            }
+        } catch (error) {
+            console.error(`Failed to register consumer: ${error}`);
+            return {
+                success: false,
+                error
+            };
+        }
     }
 
     private async fetchMessage(batch: boolean = false): Promise<Response<any>> {
         try {
-            let url = `${this.brokerUrl}/consume/${this.brokerId} /${this.topicId}/${this.partitionId}`;
+            let url = `${this.brokerUrl}/consume/${this.brokerId}/${this.topicId}/${this.partitionId}`;
             if (batch) {
                 url += `?b=t`;
             }
@@ -188,7 +234,10 @@ class Consumer {
                 throw new Error(`Failed to consume message: ${response.error}`);
             }
 
-            return response.data;
+            return {
+                success: true,
+                data: response.data
+            }
         } catch (error) {
             console.error(`Failed to consume message: ${error}`);
             return {

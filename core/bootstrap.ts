@@ -18,11 +18,11 @@ interface BrokerConfig {
  * Bootstrap utilities for initializing the Panda-Q data storage
  */
 export class Bootstrap {
-    private static readonly CONFIG_FILE = "mock-config.txt";
+    private static readonly CONFIG_FILE = "pandaq-config.json";
     private static readonly DATA_DIR = "pandaq-data";
 
     /**
-     * Parse the mock-config.txt file
+     * Parse the pandaq-config.json file
      */
     static parseConfig(): BrokerConfig {
         console.log("[Bootstrap] Parsing configuration file...");
@@ -33,53 +33,47 @@ export class Bootstrap {
         }
 
         const content = fs.readFileSync(configPath, 'utf-8');
-        const lines = content.split('\n');
 
-        let brokerId = '';
-        const topics: TopicConfig[] = [];
-        let currentTopic: Partial<TopicConfig> | null = null;
-        let reboot = false;
+        try {
+            const config = JSON.parse(content);
 
-        for (const line of lines) {
-            const trimmed = line.trim();
-
-            // Parse broker ID
-            if (trimmed.startsWith('ID:') && !currentTopic) {
-                brokerId = trimmed.split(':')[1].trim();
+            // Validate required fields
+            if (!config.brokerId || typeof config.brokerId !== 'string') {
+                throw new Error("Missing or invalid 'brokerId' in config");
             }
 
-            // Parse reboot flag
-            if (trimmed.startsWith('reboot:')) {
-                const value = trimmed.split(':')[1].trim().toLowerCase();
-                reboot = value === 'true';
+            if (!Array.isArray(config.topics)) {
+                throw new Error("Missing or invalid 'topics' array in config");
             }
 
-            // Start of a new topic (detect topic-level - ID:)
-            if (trimmed.startsWith('- ID:')) {
-                // Save previous topic
-                if (currentTopic && currentTopic.id && currentTopic.partitions) {
-                    topics.push(currentTopic as TopicConfig);
+            // Transform topics to expected format
+            const topics: TopicConfig[] = config.topics.map((topic: any) => {
+                if (!topic.id || typeof topic.id !== 'string') {
+                    throw new Error("Each topic must have a valid 'id' string");
                 }
-                currentTopic = { id: trimmed.split(':')[1].trim() };
-            }
-            // Parse topic name (ignored, kept for backward compatibility)
-            else if (trimmed.startsWith('name:') && currentTopic) {
-                // name field is ignored
-            }
-            // Parse topic partitions (simple integer format)
-            else if (trimmed.startsWith('partitions:') && currentTopic) {
-                const partitionValue = trimmed.split(':')[1].trim();
-                currentTopic.partitions = parseInt(partitionValue);
-            }
-        }
+                if (!topic.partitions || typeof topic.partitions !== 'number') {
+                    throw new Error(`Topic '${topic.id}' must have a valid 'partitions' number`);
+                }
+                return {
+                    id: topic.id,
+                    partitions: topic.partitions
+                };
+            });
 
-        // Add last topic
-        if (currentTopic && currentTopic.id && currentTopic.partitions) {
-            topics.push(currentTopic as TopicConfig);
-        }
+            const result: BrokerConfig = {
+                brokerId: config.brokerId,
+                topics,
+                reboot: config.reboot === true
+            };
 
-        console.log(`[Bootstrap] Parsed config - Broker: ${brokerId}, Topics: ${topics.length}, Reboot: ${reboot}`);
-        return { brokerId, topics, reboot };
+            console.log(`[Bootstrap] Parsed config - Broker: ${result.brokerId}, Topics: ${result.topics.length}, Reboot: ${result.reboot}`);
+            return result;
+        } catch (error) {
+            if (error instanceof SyntaxError) {
+                throw new Error(`Invalid JSON in config file: ${error.message}`);
+            }
+            throw error;
+        }
     }
 
     /**

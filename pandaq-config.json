@@ -1,0 +1,10 @@
+{
+  "brokerId": "broker_1",
+  "reboot": false,
+  "topics": [
+    {
+      "id": "nasal",
+      "partitions": 2
+    }
+  ]
+}

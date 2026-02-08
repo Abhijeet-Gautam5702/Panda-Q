@@ -1,3 +1,4 @@
+![Panda-Q Banner](https://drive.google.com/uc?export=view&id=1amOdDh9TeyEYaMfAlUhViOpC7ADDehEX)
 # Panda-Q 🐼
 
 A single-node, performant & durable message broker with **at-least-once** delivery semantics.
@@ -69,7 +70,7 @@ curl -X POST http://localhost:3000/commit \
 
 ## Learn More
 
-- **[Architecture Guide](./ARCHITECTURE.md)** — Deep dive into components, data flow & offset semantics
+- **[Architecture Guide](ARCHITECTURE.md)** — Deep dive into components, data flow & offset semantics
 
 ---
 

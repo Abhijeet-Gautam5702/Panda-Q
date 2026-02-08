@@ -163,7 +163,7 @@ class IngressBuffer {
 
     private updateReadOffset(finalOffset?: number): Response<boolean> {
         try {
-            if (finalOffset) {
+            if (finalOffset !== undefined) {
                 this.readOffset = finalOffset;
             } else {
                 this.readOffset += 1;
@@ -184,7 +184,7 @@ class IngressBuffer {
 
     private updateLogEndOffset(finalOffset?: number): Response<boolean> {
         try {
-            if (finalOffset) {
+            if (finalOffset !== undefined) {
                 this.logEndOffset = finalOffset;
             } else {
                 this.logEndOffset += 1;

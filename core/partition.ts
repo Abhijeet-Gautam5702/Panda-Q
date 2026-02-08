@@ -175,7 +175,7 @@ class Partition {
 
     private updateReadOffset(finalOffset?: number): Response<boolean> {
         try {
-            if (finalOffset) {
+            if (finalOffset !== undefined) {
                 this.readOffset = finalOffset;
             } else {
                 this.readOffset += 1;
@@ -199,7 +199,7 @@ class Partition {
 
     private updateLogEndOffset(finalOffset?: number): Response<boolean> {
         try {
-            if (finalOffset) {
+            if (finalOffset !== undefined) {
                 this.logEndOffset = finalOffset;
             } else {
                 this.logEndOffset += 1;
@@ -281,7 +281,7 @@ class Partition {
         }
     }
 
-    batchExtract(batchSize: number): Response<Message[]> {
+    batchExtract(batchSize: number): Response<{ messages: Message[]; startOffset: number; endOffset: number }> {
         try {
             if (this.buffer.isEmpty()) {
                 return {
@@ -291,25 +291,23 @@ class Partition {
                 };
             }
 
-            const batch: Message[] = [];
-            const n = Math.min(batchSize, this.buffer.size());
+            // Use peekBatch to read messages WITHOUT removing them from buffer
+            // Messages will only be removed when consumer calls /commit
+            const batch = this.buffer.peekBatch(batchSize);
 
-            for (let i = 0; i < n; i++) {
-                const message = this.buffer.dequeue();
-                if (message) {
-                    batch.push(message);
-                }
-            }
-
-            // Note: readOffset should be updated by the consumer only (via HTTP /commit endpoint)
-            // const updateResult = this.updateReadOffset(this.readOffset + n);
-            // if (!updateResult.success) {
-            //     return updateResult;
-            // }
+            // startOffset: current readOffset (last message that was already committed/extracted)
+            // endOffset: what the consumer should commit after processing these messages
+            //            (this becomes the new readOffset = "last message extracted")
+            const startOffset = this.readOffset;
+            const endOffset = this.readOffset + batch.length;
 
             return {
                 success: true,
-                data: batch
+                data: {
+                    messages: batch,
+                    startOffset,
+                    endOffset
+                }
             };
         } catch (error) {
             return {
@@ -329,6 +327,13 @@ class Partition {
                     errorCode: ERROR_CODES.INVALID_OFFSET,
                     error: new Error(`Invalid offset: ${offset} exceeds logEndOffset: ${this.logEndOffset}`)
                 };
+            }
+
+            // Calculate how many messages to remove from buffer
+            const messagesToDequeue = offset - this.readOffset;
+            if (messagesToDequeue > 0) {
+                // Actually remove the committed messages from the buffer
+                this.buffer.dequeueBatch(messagesToDequeue);
             }
 
             // Update readOffset

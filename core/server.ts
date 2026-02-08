@@ -3,6 +3,7 @@ import Broker from './broker.js';
 import { Message, TopicId } from './shared/types.js';
 import { internalTPCMap } from './main.js';
 import { writeTPCLog } from './shared/tpc-helper.js';
+import ERROR_CODES from './shared/error-codes.js';
 
 /**
  * HTTP Server for Panda-Q Broker
@@ -126,19 +127,58 @@ class Server {
 
                 const isBatch = b === 't' || b === 'true';
 
-                // TODO: Implement actual consumption logic from partition
                 console.log(`[SERVER] Consume request - Broker: ${brokerId}, Topic: ${topicId}, Partition: ${partitionId}, Batch: ${isBatch}`);
 
-                // Placeholder response
-                const response = {
+                // Get topic from broker
+                const topic = this.broker.getTopic(topicId);
+                if (!topic) {
+                    return res.status(404).json({
+                        success: false,
+                        error: `Topic ${topicId} not found`
+                    });
+                }
+
+                // Get partition from topic
+                const partitionIdNum = Number(partitionId);
+                const partition = topic.getPartition(partitionIdNum);
+                if (!partition) {
+                    return res.status(404).json({
+                        success: false,
+                        error: `Partition ${partitionId} not found in topic ${topicId}`
+                    });
+                }
+
+                // Extract messages from partition buffer
+                const batchSize = isBatch ? 100 : 1;
+                const extractResult = partition.batchExtract(batchSize);
+
+                if (!extractResult.success) {
+                    // Buffer is empty - return empty result (not an error)
+                    if (extractResult.errorCode === ERROR_CODES.BUFFER_EMPTY) {
+                        return res.status(200).json({
+                            success: true,
+                            data: {
+                                messages: isBatch ? [] : null,
+                                count: 0,
+                                startOffset: 0,
+                                endOffset: 0
+                            }
+                        });
+                    }
+                    return res.status(500).json(extractResult);
+                }
+
+                const { messages, startOffset, endOffset } = extractResult.data;
+
+                res.status(200).json({
                     success: true,
                     data: {
-                        message: isBatch ? [] : null,
-                        offset: 0
+                        messages: isBatch ? messages : (messages[0] || null),
+                        count: messages.length,
+                        startOffset,
+                        endOffset  // Consumer should commit this offset after processing
                     }
-                };
-
-                res.status(200).json(response);
+                });
             } catch (error) {
                 console.error('[SERVER] Error in /consume endpoint:', error);
                 res.status(500).json({

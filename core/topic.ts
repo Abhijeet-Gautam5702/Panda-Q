@@ -17,7 +17,7 @@ class Topic {
         console.log(`[Topic] Topic ${topicId} initialized with ${noOfPartitions} partition(s)`);
     }
 
-    private async setupPartitions(): Promise<void> {
+    private setupPartitions(): void {
         // Create partitions
         for (let i = 0; i < this.noOfPartitions; i++) {
             this.partitions.set(i, new Partition(i, this.topicId));

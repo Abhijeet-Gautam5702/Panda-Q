@@ -42,6 +42,30 @@ class Queue<T> {
         return this.queue.get(this.frontOffset);
     }
 
+    peekBatch(count: number): T[] {
+        const items: T[] = [];
+        const actualCount = Math.min(count, this.size());
+        for (let i = 0; i < actualCount; i++) {
+            const item = this.queue.get(this.frontOffset + i);
+            if (item !== undefined) {
+                items.push(item);
+            }
+        }
+        return items;
+    }
+
+    dequeueBatch(count: number): T[] {
+        const items: T[] = [];
+        const actualCount = Math.min(count, this.size());
+        for (let i = 0; i < actualCount; i++) {
+            const item = this.dequeue();
+            if (item !== undefined) {
+                items.push(item);
+            }
+        }
+        return items;
+    }
+
     rear(): T | undefined {
         return this.queue.get(this.rearOffset - 1);
     }

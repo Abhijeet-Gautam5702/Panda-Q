@@ -142,7 +142,7 @@ vite.config.ts.timestamp-*
 pandaq-data/
 
 # Markdown files
-*.md
+todo.md
 
 # Text files
 *.txt

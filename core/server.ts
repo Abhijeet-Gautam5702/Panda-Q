@@ -72,6 +72,26 @@ class Server {
             }
         })
 
+        // Stats endpoint: GET /stats
+        this.app.get('/stats', async (req, res) => {
+            try {
+                const stats = this.broker.getStats();
+                res.status(200).json({
+                    success: true,
+                    data: {
+                        ...stats,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            } catch (error) {
+                console.error('[SERVER] Error in /stats endpoint:', error);
+                res.status(500).json({
+                    success: false,
+                    error: 'Internal server error'
+                });
+            }
+        });
+
         // Producer endpoint: POST /ingress/:topicId
         this.app.post('/ingress/:topicId', async (req, res) => {
             try {

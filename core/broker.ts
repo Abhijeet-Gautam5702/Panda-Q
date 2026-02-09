@@ -134,6 +134,23 @@ class Broker {
     getTopic(topicId: TopicId): Topic | undefined {
         return this.topics.get(topicId);
     }
+
+    getStats(): { brokerId: BrokerId; topicCount: number; topics: any[]; ingressBuffer: any } {
+        const topicStats: any[] = [];
+        for (const [topicId, topic] of this.topics) {
+            topicStats.push(topic.getStats());
+        }
+        return {
+            brokerId: this.brokerId,
+            topicCount: this.topics.size,
+            topics: topicStats,
+            ingressBuffer: {
+                bufferSize: this.ingressBuffer.getBufferSize(),
+                logEndOffset: this.ingressBuffer.getLogEndOffset(),
+                readOffset: this.ingressBuffer.getReadOffset()
+            }
+        };
+    }
 }
 
 export default Broker;

@@ -281,6 +281,18 @@ class IngressBuffer {
             };
         }
     }
+
+    getBufferSize(): number {
+        return this.buffer.size();
+    }
+
+    getLogEndOffset(): number {
+        return this.logEndOffset;
+    }
+
+    getReadOffset(): number {
+        return this.readOffset;
+    }
 }
 
 export default IngressBuffer;

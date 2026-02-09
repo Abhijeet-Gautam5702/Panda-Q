@@ -80,6 +80,21 @@ class Topic {
     getPartition(partitionId: PartitionId): Partition | undefined {
         return this.partitions.get(partitionId);
     }
+
+    getStats(): { topicId: TopicId; partitionCount: number; partitions: any[] } {
+        const partitionStats: any[] = [];
+        for (const [partitionId, partition] of this.partitions) {
+            partitionStats.push({
+                partitionId,
+                ...partition.getStats()
+            });
+        }
+        return {
+            topicId: this.topicId,
+            partitionCount: this.noOfPartitions,
+            partitions: partitionStats
+        };
+    }
 }
 
 export default Topic;

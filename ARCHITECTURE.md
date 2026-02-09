@@ -286,8 +286,48 @@ await consumer.commitOffset(result.data.endOffset);
 | `/ingress/:topicId` | POST | Produce message to topic |
 | `/consume/:brokerId/:topicId/:partitionId` | GET | Consume messages (add `?b=t` for batch) |
 | `/commit` | POST | Commit offset after processing |
+| `/stats` | GET | Get broker, topic, and partition statistics |
 
 ### Response Examples
+
+**Stats Response:**
+```json
+{
+    "success": true,
+    "data": {
+        "brokerId": "broker_1",
+        "topicCount": 1,
+        "topics": [
+            {
+                "topicId": "nasal",
+                "partitionCount": 2,
+                "partitions": [
+                    {
+                        "partitionId": 0,
+                        "logEndOffset": 138,
+                        "readOffset": 5,
+                        "bufferSize": 133,
+                        "pendingMessages": 133
+                    },
+                    {
+                        "partitionId": 1,
+                        "logEndOffset": 164,
+                        "readOffset": 0,
+                        "bufferSize": 164,
+                        "pendingMessages": 164
+                    }
+                ]
+            }
+        ],
+        "ingressBuffer": {
+            "bufferSize": 0,
+            "logEndOffset": 302,
+            "readOffset": 302
+        },
+        "timestamp": "2026-02-09T16:51:49.847Z"
+    }
+}
+```
 
 **Consume Response:**
 ```json

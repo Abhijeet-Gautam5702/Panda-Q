@@ -357,6 +357,15 @@ class Partition {
             };
         }
     }
+
+    getStats(): { logEndOffset: number; readOffset: number; bufferSize: number; pendingMessages: number } {
+        return {
+            logEndOffset: this.logEndOffset,
+            readOffset: this.readOffset,
+            bufferSize: this.buffer.size(),
+            pendingMessages: this.logEndOffset - this.readOffset
+        };
+    }
 }
 
 export default Partition;

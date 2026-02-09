@@ -1,4 +1,5 @@
-![Panda-Q Banner](https://drive.google.com/uc?export=view&id=1amOdDh9TeyEYaMfAlUhViOpC7ADDehEX)
+![Panda-Q Banner](https://drive.google.com/uc?export=view&id=1MSl_j-182HlSNEYEAztqSy5ZOQp_fWDA)
+
 # Panda-Q 🐼
 
 A single-node, performant & durable message broker with **at-least-once** delivery semantics.
@@ -64,6 +65,48 @@ curl http://localhost:3000/consume/broker_1/my-topic/0
 curl -X POST http://localhost:3000/commit \
   -H "Content-Type: application/json" \
   -d '{"brokerId": "broker_1", "topicId": "my-topic", "partitionId": 0, "consumerId": "test", "offset": 1}'
+
+# Get Broker stats
+curl http://localhost:3000/stats
+```
+
+### Sample Stats Response
+```json
+{
+    "success": true,
+    "data": {
+        "brokerId": "broker_1",
+        "topicCount": 1,
+        "topics": [
+            {
+                "topicId": "nasal",
+                "partitionCount": 2,
+                "partitions": [
+                    {
+                        "partitionId": 0,
+                        "logEndOffset": 138,
+                        "readOffset": 5,
+                        "bufferSize": 133,
+                        "pendingMessages": 133
+                    },
+                    {
+                        "partitionId": 1,
+                        "logEndOffset": 164,
+                        "readOffset": 0,
+                        "bufferSize": 164,
+                        "pendingMessages": 164
+                    }
+                ]
+            }
+        ],
+        "ingressBuffer": {
+            "bufferSize": 0,
+            "logEndOffset": 302,
+            "readOffset": 302
+        },
+        "timestamp": "2026-02-09T16:51:49.847Z"
+    }
+}
 ```
 
 ---

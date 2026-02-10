@@ -77,6 +77,16 @@ class Topic {
         return await partition.push(message);
     }
 
+    async batchPush(messages: Message[]): Promise<Response<void>> {
+        for (const message of messages) {
+            const result = await this.push(message);
+            if (!result.success) {
+                return result;
+            }
+        }
+        return { success: true, data: undefined };
+    }
+
     getPartition(partitionId: PartitionId): Partition | undefined {
         return this.partitions.get(partitionId);
     }

@@ -6,6 +6,7 @@ import { Message, FilePath, TopicId, LOG_FILE_TYPE, Response } from "./shared/ty
 import fs from "fs";
 import dotenv from "dotenv"
 import getEnv from "./shared/env-config.js";
+import { promises as fsPromises } from "fs";
 dotenv.config();
 
 /**
@@ -33,6 +34,13 @@ class IngressBuffer {
     logEndOffset: number = 0;
     readOffset: number = 0;
     private readonly logHandler: LogFileHandler;
+
+    // Batched write staging
+    private static readonly BATCH_SIZE: number = 1000;
+    private static readonly FLUSH_INTERVAL_MS: number = 200;
+    private pendingWrites: { message: Message; offset: number }[] = [];
+    private flushTimer: ReturnType<typeof setTimeout> | null = null;
+    private isFlushing: boolean = false;
 
     constructor() {
         console.log("[IngressBuffer] Initializing IngressBuffer...");
@@ -204,6 +212,66 @@ class IngressBuffer {
     }
 
     // Public methods
+
+    // Flush all pending writes to disk in a single I/O operation.
+    // This is called automatically when the batch threshold is reached
+    // or when the flush timer fires.
+    private async flushPendingWrites(): Promise<Response<boolean>> {
+        if (this.isFlushing || this.pendingWrites.length === 0) {
+            return { success: true, data: true };
+        }
+        this.isFlushing = true;
+
+        // Clear the flush timer since we're flushing now
+        if (this.flushTimer) {
+            clearTimeout(this.flushTimer);
+            this.flushTimer = null;
+        }
+
+        // Grab the current batch and reset
+        const batch = this.pendingWrites;
+        this.pendingWrites = [];
+
+        try {
+            // Build a single string for all log entries
+            let logData = '';
+            for (const entry of batch) {
+                const stringifiedContent = typeof entry.message.content === 'string'
+                    ? entry.message.content
+                    : JSON.stringify(entry.message.content);
+                logData += [getEnv().BROKER_ID, entry.offset, entry.message.topicId, entry.message.messageId, stringifiedContent].join('|') + '\n';
+            }
+
+            // Single disk write for the entire batch
+            await fsPromises.appendFile(IngressBuffer.logFilePath, logData, 'utf-8');
+
+            // Single metadata update for the final offset
+            const finalOffset = batch[batch.length - 1].offset;
+            this.logEndOffset = finalOffset;
+            fs.writeFileSync(IngressBuffer.metadataFilePath, `ingress|${this.logEndOffset}|${this.readOffset}\n`);
+
+            this.isFlushing = false;
+            return { success: true, data: true };
+        } catch (error) {
+            this.isFlushing = false;
+            return {
+                success: false,
+                errorCode: ERROR_CODES.LOG_FILE_APPEND_FAILED,
+                error: error
+            };
+        }
+    }
+
+    // Schedule a flush after FLUSH_INTERVAL_MS if one isn't already pending.
+    private scheduleFlush(): void {
+        if (!this.flushTimer) {
+            this.flushTimer = setTimeout(() => {
+                this.flushTimer = null;
+                this.flushPendingWrites();
+            }, IngressBuffer.FLUSH_INTERVAL_MS);
+        }
+    }
+
     async push(message: Message): Promise<Response<boolean>> {
         try {
             if (this.buffer.size() >= this.maxLength) {
@@ -215,18 +283,21 @@ class IngressBuffer {
                 };
             }
 
-            const newLogEndOffset = this.logEndOffset + 1;
-            const appendResult = await this.logHandler.append(message, newLogEndOffset);
+            // Stage the write — compute the offset eagerly so ordering is preserved
+            const newLogEndOffset = this.logEndOffset + this.pendingWrites.length + 1;
+            this.pendingWrites.push({ message, offset: newLogEndOffset });
 
-            if (!appendResult.success) {
-                return appendResult;
-            }
-
+            // Enqueue into the in-memory buffer immediately (available for broker loop)
             this.buffer.enqueue(message);
 
-            const updateResult = this.updateLogEndOffset(newLogEndOffset);
-            if (!updateResult.success) {
-                return updateResult;
+            // Flush when batch threshold is reached, otherwise schedule a timer flush
+            if (this.pendingWrites.length >= IngressBuffer.BATCH_SIZE) {
+                const flushResult = await this.flushPendingWrites();
+                if (!flushResult.success) {
+                    return flushResult;
+                }
+            } else {
+                this.scheduleFlush();
             }
 
             return {

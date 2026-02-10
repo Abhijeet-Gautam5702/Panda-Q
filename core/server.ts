@@ -169,34 +169,57 @@ class Server {
                 }
 
                 // Extract messages from partition buffer
-                const batchSize = isBatch ? 100 : 1;
-                const extractResult = partition.batchExtract(batchSize);
+                const batchSize = isBatch ? 5000 : 1;
 
-                if (!extractResult.success) {
-                    // Buffer is empty - return empty result (not an error)
-                    if (extractResult.errorCode === ERROR_CODES.BUFFER_EMPTY) {
-                        return res.status(200).json({
-                            success: true,
-                            data: {
-                                messages: isBatch ? [] : null,
-                                count: 0,
-                                startOffset: 0,
-                                endOffset: 0
-                            }
-                        });
+                // Accumulate messages until batchSize is reached or buffer is empty
+                const allMessages: any[] = [];
+                let firstStartOffset = 0;
+                let lastEndOffset = 0;
+                let isFirstExtract = true;
+
+                while (allMessages.length < batchSize) {
+                    const remaining = batchSize - allMessages.length;
+                    const extractResult = partition.batchExtract(remaining);
+
+                    if (!extractResult.success) {
+                        // Buffer is empty — break out and return what we have so far
+                        if (extractResult.errorCode === ERROR_CODES.BUFFER_EMPTY) {
+                            break;
+                        }
+                        return res.status(500).json(extractResult);
                     }
-                    return res.status(500).json(extractResult);
+
+                    const { messages, startOffset, endOffset } = extractResult.data;
+                    if (messages.length === 0) break;
+
+                    if (isFirstExtract) {
+                        firstStartOffset = startOffset;
+                        isFirstExtract = false;
+                    }
+                    lastEndOffset = endOffset;
+                    allMessages.push(...messages);
                 }
 
-                const { messages, startOffset, endOffset } = extractResult.data;
+                // If we collected nothing, return empty result
+                if (allMessages.length === 0) {
+                    return res.status(200).json({
+                        success: true,
+                        data: {
+                            messages: isBatch ? [] : null,
+                            count: 0,
+                            startOffset: 0,
+                            endOffset: 0
+                        }
+                    });
+                }
 
                 res.status(200).json({
                     success: true,
                     data: {
-                        messages: isBatch ? messages : (messages[0] || null),
-                        count: messages.length,
-                        startOffset,
-                        endOffset  // Consumer should commit this offset after processing
+                        messages: isBatch ? allMessages : (allMessages[0] || null),
+                        count: allMessages.length,
+                        startOffset: firstStartOffset,
+                        endOffset: lastEndOffset  // Consumer should commit this offset after processing
                     }
                 });
             } catch (error) {

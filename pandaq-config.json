@@ -1,10 +1,10 @@
 {
   "brokerId": "broker_1",
-  "reboot": false,
+  "reboot": true,
   "topics": [
     {
-      "id": "nasal",
-      "partitions": 2
+      "id": "latency-test",
+      "partitions": 1
     }
   ]
 }

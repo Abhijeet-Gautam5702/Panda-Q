@@ -1,6 +1,6 @@
 import IngressBuffer from "./ingress-buffer.js";
 import ERROR_CODES from "./shared/error-codes.js";
-import { TopicId, BrokerId, Response, ConsumerId, PartitionId } from "./shared/types.js";
+import { TopicId, BrokerId, Response, ConsumerId, PartitionId, Message } from "./shared/types.js";
 import Topic from "./topic.js";
 import { internalTPCMap } from "./main.js";
 import { writeTPCLog } from "./shared/tpc-helper.js";
@@ -44,7 +44,7 @@ class Broker {
         while (true) {
             cycleCount++;
             // fetch a batch of messages from the ingress buffer
-            const batchResponse = this.ingressBuffer.batchExtract(100);
+            const batchResponse = this.ingressBuffer.batchExtract(5000);
             if (!batchResponse.success) {
                 // Buffer is empty, just continue to next cycle
                 await new Promise((resolve) => setTimeout(resolve, 100));
@@ -65,6 +65,26 @@ class Broker {
                 }
                 await topic.push(message);
             }
+
+            // // Group messages by topicId
+            // const messagesByTopic = new Map<string, Message[]>();
+            // for (const message of batchResponse.data) {
+            //     const topicId = message.topicId;
+            //     if (!messagesByTopic.has(topicId)) {
+            //         messagesByTopic.set(topicId, []);
+            //     }
+            //     messagesByTopic.get(topicId)!.push(message);
+            // }
+
+            // // Push each topic's batch at once
+            // for (const [topicId, messages] of messagesByTopic) {
+            //     const topic = this.topics.get(topicId);
+            //     if (!topic) {
+            //         console.log(`[Broker] Topic ${topicId} not found for ${messages.length} message(s)`);
+            //         continue;
+            //     }
+            //     await topic.batchPush(messages);
+            // }
 
             // yield back to the event loop (avoid thread blocking)
             await new Promise((resolve) => setTimeout(resolve, 100));
